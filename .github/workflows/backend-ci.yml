@@ -16,7 +16,6 @@ jobs:
   pre-commit:
     name: pre-commit (ruff/black/isort/mypy)
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -28,7 +27,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('backend/.pre-commit-config.yml') }}
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('backend/.pre-commit-config.yaml') }}
 
       - name: Install pre-commit
         run: python -m pip install --upgrade pip pre-commit
@@ -36,7 +35,7 @@ jobs:
       - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.1
         with:
-          extra_args: -C backend -c backend/.pre-commit-config.yml
+          extra_args: -c backend/.pre-commit-config.yaml
 
   tests:
     name: pytest
@@ -69,17 +68,14 @@ jobs:
           --health-retries=10
 
     env:
-      # Django/DRF
       DJANGO_SETTINGS_MODULE: vitally.settings
       DJANGO_DEBUG: "false"
       DJANGO_SECRET_KEY: test_key
       JWT_SIGNING_KEY: test_jwt_key
 
-      # Apontar para services do job (localhost)
       DATABASE_URL: postgresql://vitally:vitally@localhost:5432/vitally
       REDIS_URL: redis://localhost:6379/0
 
-      # Evitar chamadas reais em testes
       SENDGRID_API_KEY: dummy
       SENDGRID_FROM_EMAIL: no-reply@vitally.test
       WA_ACCESS_TOKEN: dummy

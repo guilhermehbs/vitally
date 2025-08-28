@@ -12,11 +12,6 @@ exclude: |
     backend/.mypy_cache/|
     backend/.ruff_cache/|
     backend/.pytest_cache/|
-    backend/.tox/|
-    backend/.git/|
-    backend/.eggs/|
-    backend/build/|
-    backend/dist/|
     backend/.*/migrations/|
     .*/node_modules/
   )
@@ -28,7 +23,6 @@ repos:
       - id: ruff
         name: ruff (lint + fix)
         args: [--fix]
-        additional_dependencies: []
         stages: [commit]
 
   - repo: https://github.com/psf/black
@@ -57,6 +51,7 @@ repos:
           - djangorestframework-stubs
         stages: [commit]
 
+  # Roda testes localmente antes do push
   - repo: local
     hooks:
       - id: pytest-pre-push
