@@ -147,6 +147,9 @@ class PacienteRepository:
 
     def _load_df(self) -> pd.DataFrame:
         df = self._sheets.load_sheet_as_df(self._worksheet)
+        if df is None:
+            return pd.DataFrame(columns=COLS)
+
         if df.empty:
             return pd.DataFrame(columns=COLS)
 
