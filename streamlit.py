@@ -13,13 +13,15 @@ load_dotenv()
 SPREADSHEET_ID = os.getenv("GOOGLE_SPREADSHEET_ID", st.secrets.get("GOOGLE_SPREADSHEET_ID"))
 WORKSHEET = os.getenv("GOOGLE_SHEETS_WORKSHEET", st.secrets.get("GOOGLE_SHEETS_WORKSHEET", "Pacientes"))
 
+
 if "google_service_account" in st.secrets:
     cred_path = "credentials.json"
     data = st.secrets["google_service_account"]
-    if hasattr(data, "to_dict"):
-        data = data.to_dict()
-    else:
-        data = dict(data)
+    data = data.to_dict() if hasattr(data, "to_dict") else dict(data)
+
+    if "private_key" in data and isinstance(data["private_key"], str):
+        data["private_key"] = data["private_key"].replace("\\n", "\n")
+
     with open(cred_path, "w", encoding="utf-8") as f:
         json.dump(data, f)
     os.environ["GOOGLE_CREDENTIALS_FILE"] = cred_path
