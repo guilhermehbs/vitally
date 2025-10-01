@@ -15,11 +15,7 @@ class PacienteRepositoryProtocol(Protocol):
 
 
 class ClinicaService:
-    def __init__(
-        self,
-        repo: PacienteRepositoryProtocol | None = None,
-        when_fn: Callable[[], date] | None = None,
-    ) -> None:
+    def __init__(self, repo: PacienteRepositoryProtocol | None = None, when_fn: Callable[[], date] | None = None) -> None:
         self._repo: PacienteRepositoryProtocol = repo or PacienteRepository()
         self._today: Callable[[], date] = when_fn or date.today
 

@@ -1,15 +1,24 @@
 from __future__ import annotations
 
+import os, json, pandas as pd, streamlit as st
+
 from datetime import date
 from typing import Iterable, Dict, Any
-
-import pandas as pd
-import streamlit as st
 from dotenv import load_dotenv
+
+from src.services import ClinicaService
 
 load_dotenv()
 
-from src.services import ClinicaService
+SPREADSHEET_ID = os.getenv("GOOGLE_SPREADSHEET_ID", st.secrets.get("GOOGLE_SPREADSHEET_ID"))
+WORKSHEET = os.getenv("GOOGLE_SHEETS_WORKSHEET", st.secrets.get("GOOGLE_SHEETS_WORKSHEET", "Pacientes"))
+
+if "google_service_account" in st.secrets:
+    cred_path = "credentials.json"
+    with open(cred_path, "w") as f:
+        json.dump(st.secrets["google_service_account"], f)
+    os.environ["GOOGLE_CREDENTIALS_FILE"] = cred_path
+
 
 APP_TITLE = '🩺 Vitally'
 PAGE_ICON = '🩺'
@@ -62,7 +71,7 @@ def render_list_tab(service: ClinicaService) -> None:
             'Telefone': p.telefone,
             'Email': p.email,
             'Entrada': format_date_br(p.data_entrada),
-            'Último pagagamento': format_date_br(p.data_ultimo_pagamento),
+            'Último pagamento': format_date_br(p.data_ultimo_pagamento),
             'Próxima cobrança': format_date_br(p.data_proxima_cobranca),
             'Ativo': p.ativo,
         }
