@@ -15,8 +15,13 @@ WORKSHEET = os.getenv("GOOGLE_SHEETS_WORKSHEET", st.secrets.get("GOOGLE_SHEETS_W
 
 if "google_service_account" in st.secrets:
     cred_path = "credentials.json"
-    with open(cred_path, "w") as f:
-        json.dump(st.secrets["google_service_account"], f)
+    data = st.secrets["google_service_account"]
+    if hasattr(data, "to_dict"):
+        data = data.to_dict()
+    else:
+        data = dict(data)
+    with open(cred_path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
     os.environ["GOOGLE_CREDENTIALS_FILE"] = cred_path
 
 
