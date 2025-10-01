@@ -1,1 +1,1 @@
-from .paciente_repository import PacienteRepository
+from .paciente_repository_sql import PacienteRepositorySQL

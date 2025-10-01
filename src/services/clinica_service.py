@@ -1,37 +1,30 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
-from typing import Sequence, Protocol, Callable
+from datetime import date
+from typing import Sequence
 
-from src.models import PacienteModel
-from src.repositories import PacienteRepository
+from src.models import Paciente
 
-
-class PacienteRepositoryProtocol(Protocol):
-    def add_paciente(self, nome: str, email: str, telefone: str, data_entrada: date) -> PacienteModel: ...
-    def list_all(self, only_active: bool = True) -> Sequence[PacienteModel]: ...
-    def registrar_pagamento(self, paciente_id: str, data_pag: date) -> PacienteModel: ...
-    def list_due_on(self, dia: date) -> Sequence[PacienteModel]: ...
+from src.repositories import PacienteRepositorySQL
 
 
 class ClinicaService:
-    def __init__(self, repo: PacienteRepositoryProtocol | None = None, when_fn: Callable[[], date] | None = None) -> None:
-        self._repo: PacienteRepositoryProtocol = repo or PacienteRepository()
-        self._today: Callable[[], date] = when_fn or date.today
+    def __init__(self, repo: PacienteRepositorySQL | None = None):
+        self._repo = repo or PacienteRepositorySQL()
 
-    def cadastrar_paciente(self, nome: str, email: str, telefone: str, data_entrada: date) -> PacienteModel:
-        return self._repo.add_paciente(nome.strip(), email.strip(), telefone.strip(), data_entrada)
+    def cadastrar_paciente(self, nome: str, email: str, telefone: str, data_entrada: date) -> Paciente:
+        nome = (nome or "").strip()
+        email = (email or "").strip()
+        telefone = (telefone or "").strip()
+        return self._repo.cadastrar(nome, email, telefone, data_entrada)
 
-    def listar_pacientes(self, only_active: bool = True) -> Sequence[PacienteModel]:
-        return self._repo.list_all(only_active)
+    def listar_pacientes(self, only_active: bool = True) -> Sequence[Paciente]:
+        return self._repo.listar(only_active)
 
-    def registrar_pagamento(self, paciente_id: str, data_pag: date) -> PacienteModel:
-        return self._repo.registrar_pagamento(paciente_id.strip(), data_pag)
+    def registrar_pagamento(self, paciente_id: int | str, data_pag: date) -> Paciente:
+        if isinstance(paciente_id, str):
+            paciente_id = int(paciente_id.strip())
+        return self._repo.registrar_pagamento(paciente_id, data_pag)
 
-    def vencimentos_proximos(self, dias: int = 7) -> Sequence[PacienteModel]:
-        hoje = self._today()
-        resultados: list[PacienteModel] = []
-        for i in range(dias + 1):
-            dia = hoje + timedelta(days=i)
-            resultados.extend(self._repo.list_due_on(dia))
-        return resultados
+    def vencimentos_proximos(self) -> Sequence[Paciente]:
+        return self._repo.vencimentos_proximos()
