@@ -1,1 +1,1 @@
-from .paciente_model import PacienteModel
+from .paciente_model import Paciente
