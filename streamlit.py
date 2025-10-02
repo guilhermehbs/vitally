@@ -158,25 +158,24 @@ def render_add_tab(service: ClinicaService) -> None:
             format="DD/MM/YYYY",
             key="add_data_entrada",
         )
-
         submitted = st.form_submit_button("Cadastrar")
 
     if not submitted:
-        st.stop()
+        return
 
     if not nome:
         st.error("Informe o nome.")
-        st.stop()
+        return
 
     if email and not is_valid_email(email):
         st.error("E-mail inválido.")
-        st.stop()
+        return
 
     fone_digits = only_digits(telefone_raw)
     ok, msg = validate_br_phone(fone_digits)
     if not ok:
         st.error(msg or "Telefone inválido. Digite DDD + número (ex.: 3199XXXXXXX ou 3130XXXXXX).")
-        st.stop()
+        return
 
     try:
         paciente = service.cadastrar_paciente(
@@ -190,7 +189,8 @@ def render_add_tab(service: ClinicaService) -> None:
         rerun_app()
     except Exception as exc:
         st.error(f"Erro ao cadastrar paciente: {exc}")
-        logger.error(f"Erro ao cadastrar paciente: {exc}", exc_info=True)
+        logger.error("Erro ao cadastrar paciente: %s", exc, exc_info=True)
+
 
 
 def render_pay_tab(service: ClinicaService) -> None:
