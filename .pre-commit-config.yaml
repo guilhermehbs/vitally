@@ -4,15 +4,14 @@ default_language_version:
 ci:
   autoupdate_schedule: monthly
 
-files: ^backend/
 exclude: |
   (?x)^(
-    backend/.venv/|
-    backend/venv/|
-    backend/.mypy_cache/|
-    backend/.ruff_cache/|
-    backend/.pytest_cache/|
-    backend/.*/migrations/|
+    \.venv/|
+    venv/|
+    \.mypy_cache/|
+    \.ruff_cache/|
+    \.pytest_cache/|
+    .*/migrations/|
     .*/node_modules/
   )
 
@@ -44,19 +43,15 @@ repos:
     rev: v1.11.2
     hooks:
       - id: mypy
-        name: mypy (django)
-        args: ["--config-file", "backend/pyproject.toml"]
-        additional_dependencies:
-          - django-stubs
-          - djangorestframework-stubs
+        name: mypy
+        args: ["--config-file", "pyproject.toml"]
         stages: [commit]
 
-  # Roda testes localmente antes do push
   - repo: local
     hooks:
       - id: pytest-pre-push
         name: pytest (pre-push)
-        entry: bash -lc "cd backend && pytest -q"
+        entry: bash -lc "pytest -q"
         language: system
         pass_filenames: false
         stages: [push]
