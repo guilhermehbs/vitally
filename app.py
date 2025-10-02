@@ -7,9 +7,9 @@ from datetime import date
 from typing import Any
 
 import pandas as pd
+import streamlit as st
 from dotenv import load_dotenv
 
-import app as st
 from src.services.clinica_service import ClinicaService
 
 logging.basicConfig(
