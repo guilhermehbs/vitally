@@ -5,30 +5,29 @@ requires-python = ">=3.13"
 
 [tool.black]
 line-length = 100
-target-version = ["py311","py312","py313"]
-exclude = "migrations|\\.venv|venv|build|dist"
+target-version = ["py313"]
+exclude = "migrations|\\.venv|venv|build|dist|\\.ruff_cache|\\.mypy_cache"
 
 [tool.isort]
 profile = "black"
 line_length = 100
-known_first_party = ["apps","vitally"]
+known_first_party = ["src"]
+skip = [".venv","venv","build","dist",".ruff_cache",".mypy_cache","migrations"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py313"
-extend-exclude = ["migrations",".venv","venv"]
-# Sintaxe nova do Ruff 0.6+
-lint.select = ["E","F","I","B","UP"]
+extend-exclude = ["migrations",".venv","venv","build","dist",".ruff_cache",".mypy_cache"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
 
 [tool.mypy]
 python_version = "3.13"
-plugins = ["mypy_django_plugin.main"]
 ignore_missing_imports = true
 strict_optional = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_unused_configs = true
-exclude = "(^|/)migrations/"
-
-[mypy.plugins.django-stubs]
-django_settings_module = "vitally.settings"
+exclude = "(^|/)(migrations|\\.venv|venv|build|dist|\\.ruff_cache|\\.mypy_cache)(/|$)"
+mypy_path = ["src"]
