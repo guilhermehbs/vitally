@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import os
-import sys
-import ssl
-import smtplib
 import logging
+import os
+import smtplib
+import ssl
+import sys
+from collections.abc import Iterable
 from datetime import date, timedelta
 from email.message import EmailMessage
-from typing import Iterable
 
 from dotenv import load_dotenv
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 
-from src.db import SessionLocal
-from src.models_sql import PacienteSQL
+from src.db.db import SessionLocal
+from src.db.tables import PacienteSQL
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,7 +22,14 @@ logging.basicConfig(
 )
 log = logging.getLogger("send_reminders")
 
-def build_message(sender: str, to_email: str, to_name: str | None, vencimento: date) -> EmailMessage:
+
+def build_message(
+    sender: str,
+    to_email: str,
+    to_name: str | None,
+    vencimento: date,
+) -> EmailMessage:
+
     assunto = "Lembrete de pagamento - Vitally"
     nome = to_name or "Paciente"
     venc_br = vencimento.strftime("%d/%m/%Y")
@@ -54,7 +61,15 @@ def build_message(sender: str, to_email: str, to_name: str | None, vencimento: d
     msg.add_alternative(html, subtype="html")
     return msg
 
-def send_email(host: str, port: int, username: str | None, password: str | None, use_tls: bool, message: EmailMessage) -> None:
+
+def send_email(
+    host: str,
+    port: int,
+    username: str | None,
+    password: str | None,
+    use_tls: bool,
+    message: EmailMessage,
+) -> None:
     if use_tls:
         context = ssl.create_default_context()
         with smtplib.SMTP(host, port) as smtp:
@@ -68,6 +83,7 @@ def send_email(host: str, port: int, username: str | None, password: str | None,
             if username and password:
                 smtp.login(username, password)
             smtp.send_message(message)
+
 
 def get_pacientes_com_vencimento_em_ate_7_dias() -> Iterable[PacienteSQL]:
     hoje = date.today()
@@ -88,6 +104,7 @@ def get_pacientes_com_vencimento_em_ate_7_dias() -> Iterable[PacienteSQL]:
             .order_by(PacienteSQL.data_proxima_cobranca.asc())
         )
         return s.execute(stmt).scalars().all()
+
 
 def main() -> int:
     load_dotenv()
@@ -148,10 +165,17 @@ def main() -> int:
                 message=msg,
             )
             enviados += 1
-            log.info("Lembrete enviado para id=%s email=%s venc=%s", p.id, p.email, p.data_proxima_cobranca)
+            log.info(
+                "Lembrete enviado para id=%s email=%s venc=%s",
+                p.id,
+                p.email,
+                p.data_proxima_cobranca,
+            )
         except Exception as e:
             falhas += 1
-            log.error("Falha ao enviar e-mail para id=%s email=%s: %s", p.id, p.email, e, exc_info=True)
+            log.error(
+                "Falha ao enviar e-mail para id=%s email=%s: %s", p.id, p.email, e, exc_info=True
+            )
 
     log.info("Resumo: enviados=%s, sem_email=%s, falhas=%s", enviados, pulados_sem_email, falhas)
     return 0 if falhas == 0 else 1

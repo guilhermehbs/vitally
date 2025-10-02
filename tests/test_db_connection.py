@@ -1,5 +1,7 @@
 from sqlalchemy import text
-from src.db import engine
+
+from src.db.db import engine
+
 
 def test_engine_connects():
     with engine.connect() as conn:

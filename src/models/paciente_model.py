@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
 
 
 @dataclass(slots=True, frozen=True)
@@ -12,6 +11,6 @@ class Paciente:
     telefone: str
     email: str
     data_entrada: date
-    data_ultimo_pagamento: Optional[date]
+    data_ultimo_pagamento: date | None
     data_proxima_cobranca: date
     ativo: bool = True
