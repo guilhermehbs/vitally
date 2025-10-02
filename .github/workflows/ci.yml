@@ -12,24 +12,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-
       - name: Cache pre-commit
         uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('backend/.pre-commit-config.yaml') }}
-
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-
       - name: Install pre-commit
         run: python -m pip install --upgrade pip pre-commit
-
       - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.1
-        with:
-          extra_args: -c backend/.pre-commit-config.yaml
 
   tests:
     name: pytest
@@ -40,48 +36,23 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: vitally
+          POSTGRES_DB: vitally_test
           POSTGRES_USER: vitally
           POSTGRES_PASSWORD: vitally
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U vitally -d vitally"
+          --health-cmd="pg_isready -U vitally -d vitally_test"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=10
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping || exit 1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-retries=20
 
     env:
-      DJANGO_SETTINGS_MODULE: vitally.settings
-      DJANGO_DEBUG: "false"
-      DJANGO_SECRET_KEY: test_key
-      JWT_SIGNING_KEY: test_jwt_key
-
-      DATABASE_URL: postgresql://vitally:vitally@localhost:5432/vitally
-      REDIS_URL: redis://localhost:6379/0
-
-      SENDGRID_API_KEY: dummy
-      SENDGRID_FROM_EMAIL: no-reply@vitally.test
-      WA_ACCESS_TOKEN: dummy
-      WA_PHONE_NUMBER_ID: "0"
-
-    defaults:
-      run:
-        working-directory: backend
+      PYTHONPATH: ${{ github.workspace }}
+      DATABASE_URL: postgresql+psycopg://vitally:vitally@localhost:5432/vitally_test
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -90,20 +61,30 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dev deps
+      - name: Install dependencies
         run: |
           python -m pip install -U pip
           pip install -r requirements.txt
-          pip install pytest pytest-django pytest-cov
+          pip install pytest pytest-cov
+          # opcional (se não estiver no requirements)
+          # pip install "psycopg[binary]~=3.2"
 
-      - name: Django checks & migrate
+      - name: Check DB connectivity
         run: |
-          python manage.py check
-          python manage.py migrate --noinput
+          python - << 'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          url = os.environ["DATABASE_URL"]
+          eng = create_engine(url, pool_pre_ping=True)
+          with eng.begin() as conn:
+            conn.execute(text("SELECT 1"))
+          print("DB OK:", url)
+          PY
 
       - name: Run tests
-        run: pytest -q --cov=./ --cov-report=xml
+        run: |
+          pytest -v -ra --cov=src --cov-report=xml --cov-report=term-missing
