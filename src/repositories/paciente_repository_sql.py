@@ -1,8 +1,12 @@
 from datetime import date, timedelta
+
 from sqlalchemy import select
-from ..db import SessionLocal
-from ..models_sql import PacienteSQL
-from ..models import Paciente
+
+from src.db.tables import PacienteSQL
+from src.models.paciente_model import Paciente
+
+from ..db.db import SessionLocal
+
 
 class PacienteRepositorySQL:
     def __init__(self):
@@ -49,13 +53,16 @@ class PacienteRepositorySQL:
             if not row:
                 raise ValueError(f"Paciente {paciente_id} não encontrado")
             row.data_ultimo_pagamento = data_pagamento
-            row.data_proxima_cobranca = (data_pagamento + timedelta(days=30)) if data_pagamento else None
+            row.data_proxima_cobranca = (
+                (data_pagamento + timedelta(days=30)) if data_pagamento else None
+            )
             s.commit()
             s.refresh(row)
             return self._to_model(row)
 
     def vencimentos_proximos(self) -> list[Paciente]:
         from datetime import date as _date
+
         hoje = _date.today()
         limite = hoje + timedelta(days=7)
         with self._Session() as s:

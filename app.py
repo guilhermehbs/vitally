@@ -2,43 +2,34 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, timedelta
-from typing import Iterable, Dict, Any
+from collections.abc import Iterable
+from datetime import date
+from typing import Any
 
 import pandas as pd
-import streamlit as st
 from dotenv import load_dotenv
 
-from src.services import ClinicaService
+import app as st
+from src.services.clinica_service import ClinicaService
 
-# -----------------------------------------------------------------------------
-# Logging
-# -----------------------------------------------------------------------------
 logging.basicConfig(
-    level=logging.INFO,  # mude para DEBUG se quiser mais verbosidade
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("vitally_app")
 
-# -----------------------------------------------------------------------------
-# Bootstrap
-# -----------------------------------------------------------------------------
 load_dotenv()
 logger.info("Iniciando aplicação Vitally")
 
 try:
-    # cria as tabelas (se ainda não existirem)
-    from src.db import engine, Base  # type: ignore
-    from src.models_sql import PacienteSQL  # noqa: F401  # garante import do modelo
+    from src.db.db import Base, engine
+
     Base.metadata.create_all(bind=engine)
     logger.info("Verificação/criação de tabelas concluída")
 except Exception as e:
     logger.error("Falha ao criar/verificar tabelas: %s", e, exc_info=True)
 
-# -----------------------------------------------------------------------------
-# Constantes UI
-# -----------------------------------------------------------------------------
 APP_TITLE = "🩺 Vitally"
 PAGE_ICON = "🩺"
 LAYOUT = "wide"
@@ -50,9 +41,6 @@ TAB_LABEL_DUE = "📬 Vencimentos proximos"
 
 DATE_FMT_DISPLAY = "%d/%m/%Y"
 
-# -----------------------------------------------------------------------------
-# Validações & Helpers
-# -----------------------------------------------------------------------------
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -97,13 +85,11 @@ def format_date_br(d: date | None) -> str:
     return d.strftime(DATE_FMT_DISPLAY) if d else ""
 
 
-def make_dataframe(rows: Iterable[Dict[str, Any]]) -> pd.DataFrame:
+def make_dataframe(rows: Iterable[dict[str, Any]]) -> pd.DataFrame:
     df = pd.DataFrame(list(rows))
     return df if not df.empty else pd.DataFrame()
 
-# -----------------------------------------------------------------------------
-# Telas
-# -----------------------------------------------------------------------------
+
 def render_list_tab(service: ClinicaService) -> None:
     st.subheader("Lista de pacientes")
     only_active = st.checkbox("Somente ativos", value=True, key="chk_only_active")
@@ -192,7 +178,6 @@ def render_add_tab(service: ClinicaService) -> None:
         logger.error("Erro ao cadastrar paciente: %s", exc, exc_info=True)
 
 
-
 def render_pay_tab(service: ClinicaService) -> None:
     st.subheader("Registrar pagamento")
     logger.info("Aba de pagamento carregada")
@@ -223,9 +208,7 @@ def render_pay_tab(service: ClinicaService) -> None:
             paciente = service.registrar_pagamento(pid, data_pagamento)
             prox = format_date_br(paciente.data_proxima_cobranca)
             st.success(f"Pagamento registrado. Próx. cobrança: {prox}")
-            logger.info(
-                "Pagamento OK: paciente_id=%s próxima=%s", paciente.id, prox
-            )
+            logger.info("Pagamento OK: paciente_id=%s próxima=%s", paciente.id, prox)
             rerun_app()
         except Exception as exc:
             st.error(f"Erro ao registrar pagamento: {exc}")
@@ -262,9 +245,7 @@ def render_due_tab(service: ClinicaService) -> None:
     df = make_dataframe(rows)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
+
 def main() -> None:
     st.set_page_config(page_title="Vitally", page_icon=PAGE_ICON, layout=LAYOUT)
     st.title(APP_TITLE)

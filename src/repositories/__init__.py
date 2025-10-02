@@ -1,1 +1,0 @@
-from .paciente_repository_sql import PacienteRepositorySQL

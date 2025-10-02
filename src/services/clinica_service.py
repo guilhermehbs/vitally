@@ -1,18 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
-from typing import Sequence
 
-from src.models import Paciente
-
-from src.repositories import PacienteRepositorySQL
+from src.models.paciente_model import Paciente
+from src.repositories.paciente_repository_sql import PacienteRepositorySQL
 
 
 class ClinicaService:
     def __init__(self, repo: PacienteRepositorySQL | None = None):
         self._repo = repo or PacienteRepositorySQL()
 
-    def cadastrar_paciente(self, nome: str, email: str, telefone: str, data_entrada: date) -> Paciente:
+    def cadastrar_paciente(
+        self, nome: str, email: str, telefone: str, data_entrada: date
+    ) -> Paciente:
         nome = (nome or "").strip()
         email = (email or "").strip()
         telefone = (telefone or "").strip()

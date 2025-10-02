@@ -1,11 +1,14 @@
 from sqlalchemy import inspect
-from src.db import engine
-from src.models_sql import PacienteSQL
+
+from src.db.db import engine
+from src.db.tables import PacienteSQL
+
 
 def test_table_exists():
     insp = inspect(engine)
     tables = insp.get_table_names()
     assert "pacientes" in tables
+
 
 def test_columns_schema():
     insp = inspect(engine)
@@ -20,6 +23,7 @@ def test_columns_schema():
         "data_proxima_cobranca",
         "ativo",
     }.issubset(cols)
+
 
 def test_pk_index():
     assert PacienteSQL.__table__.primary_key.columns.keys() == ["id"]
