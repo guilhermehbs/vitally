@@ -19,6 +19,39 @@ class ClinicaService:
         telefone = (telefone or "").strip()
         return self._repo.cadastrar(nome, email, telefone, data_entrada)
 
+    def editar_paciente(
+        self,
+        paciente_id: int,
+        nome: str,
+        email: str,
+        telefone: str,
+        data_entrada: date,
+        aula_seg: bool | None = None,
+        aula_ter: bool | None = None,
+        aula_qua: bool | None = None,
+        aula_qui: bool | None = None,
+        aula_sex: bool | None = None,
+        aula_sab: bool | None = None,
+        aula_dom: bool | None = None,
+    ) -> tuple[Paciente, dict[str, tuple[object, object]]]:
+        nome = (nome or "").strip()
+        email = (email or "").strip()
+        telefone = (telefone or "").strip()
+        return self._repo.editar(
+            paciente_id=paciente_id,
+            nome=nome,
+            email=email,
+            telefone=telefone,
+            data_entrada=data_entrada,
+            aula_seg=aula_seg,
+            aula_ter=aula_ter,
+            aula_qua=aula_qua,
+            aula_qui=aula_qui,
+            aula_sex=aula_sex,
+            aula_sab=aula_sab,
+            aula_dom=aula_dom,
+        )
+
     def listar_pacientes(self, only_active: bool = True) -> Sequence[Paciente]:
         return self._repo.listar(only_active)
 

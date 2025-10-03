@@ -4,12 +4,14 @@ import logging
 import re
 from collections.abc import Iterable
 from datetime import date
+from time import sleep
 from typing import Any
 
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
+from src.models.paciente_model import Paciente
 from src.services.clinica_service import ClinicaService
 
 logging.basicConfig(
@@ -36,6 +38,9 @@ LAYOUT = "wide"
 
 TAB_LABEL_LIST = "👥 Pacientes"
 TAB_LABEL_ADD = "➕ Cadastrar"
+TAB_LABEL_EDIT = "📝 Editar"
+TAB_LABEL_TABLE = "📊 Tabela"
+TAB_LABEL_CLASSES = "📚 Aulas"
 TAB_LABEL_PAY = "💳 Pagamento"
 TAB_LABEL_DUE = "📬 Vencimentos proximos"
 
@@ -79,6 +84,15 @@ def rerun_app() -> None:
     else:
         logger.critical("Streamlit sem método de rerun disponível")
         raise RuntimeError("Versão do Streamlit não possui rerun disponível")
+
+
+def get_ativos(service: ClinicaService) -> list[Paciente]:
+    try:
+        ativos = list(service.listar_pacientes(only_active=True))
+    except Exception as exc:
+        st.error(f"Erro ao listar pacientes: {exc}")
+        return []
+    return ativos
 
 
 def format_date_br(d: date | None) -> str:
@@ -172,24 +186,154 @@ def render_add_tab(service: ClinicaService) -> None:
         )
         prox = format_date_br(paciente.data_proxima_cobranca)
         st.success(f"Cadastrado #{paciente.id}. Próx. cobrança: {prox}")
+        sleep(2)
         rerun_app()
     except Exception as exc:
         st.error(f"Erro ao cadastrar paciente: {exc}")
         logger.error("Erro ao cadastrar paciente: %s", exc, exc_info=True)
 
 
+DIAS = [
+    ("Segunda", "aula_seg"),
+    ("Terça", "aula_ter"),
+    ("Quarta", "aula_qua"),
+    ("Quinta", "aula_qui"),
+    ("Sexta", "aula_sex"),
+    ("Sábado", "aula_sab"),
+    ("Domingo", "aula_dom"),
+]
+
+
+def render_edit_tab(service: ClinicaService) -> None:
+    st.subheader("Editar paciente")
+    logger.info("Aba de edição carregada")
+
+    ativos = get_ativos(service)
+    if not ativos:
+        st.info("Cadastre pacientes primeiro.")
+        return
+
+    options = {f"[{p.id}] {p.nome}": p for p in ativos}
+    escolha_label = st.selectbox("Paciente", list(options.keys()), key="edit_escolha")
+
+    with st.form("form_edit_paciente", clear_on_submit=False):
+        paciente = options[escolha_label]
+
+        pid = paciente.id
+        nome = paciente.nome
+        email = paciente.email
+        telefone = paciente.telefone
+
+        nome = st.text_input("Nome", key="edit_nome", value=nome).strip()
+        email = st.text_input("E-mail", key="edit_email", value=email).strip()
+        telefone_raw = st.text_input(
+            "Telefone", key="edit_telefone", placeholder="31999999999", value=telefone
+        )
+        data_entrada = st.date_input(
+            "Data de entrada",
+            value=paciente.data_entrada or date.today(),
+            format="DD/MM/YYYY",
+            key="edit_data_entrada",
+        )
+
+        dias_selecionados = st.multiselect(
+            "Dias de aula",
+            [d for d, _ in DIAS],
+            default=[d for d, f in DIAS if getattr(paciente, f, False)],
+            key="edit_dias",
+        )
+
+        submitted = st.form_submit_button("Editar")
+
+    if not submitted:
+        return
+
+    if not nome:
+        st.error("Informe o nome.")
+        return
+    if email and not is_valid_email(email):
+        st.error("E-mail inválido.")
+        return
+
+    fone_digits = only_digits(telefone_raw)
+    ok, msg = validate_br_phone(fone_digits)
+    if not ok:
+        st.error(msg or "Telefone inválido. Digite DDD + número (ex.: 3199XXXXXXX ou 3130XXXXXX).")
+        return
+
+    dia_kwargs = {}
+    for dia_nome, attr in DIAS:
+        dia_kwargs[attr] = dia_nome in dias_selecionados
+
+    try:
+        paciente, updates = service.editar_paciente(
+            paciente_id=int(pid),
+            nome=nome,
+            email=email,
+            telefone=fone_digits,
+            data_entrada=data_entrada,
+            **dia_kwargs,
+        )
+        st.success(f"Editado #{paciente.id}")
+        for campo, (antes, depois) in updates.items():
+            st.success(f"[EDIT] {campo}: '{antes}' → '{depois}'")
+        sleep(2)
+        rerun_app()
+    except Exception as exc:
+        st.error(f"Erro ao cadastrar paciente: {exc}")
+        logger.error("Erro ao cadastrar paciente: %s", exc, exc_info=True)
+
+
+def render_table_tab(service: ClinicaService) -> None:
+    st.subheader("Tabela")
+    logger.info("Aba de tabela carregada")
+
+    ativos = get_ativos(service)
+    if not ativos:
+        st.info("Cadastre pacientes primeiro.")
+        return
+
+    # options = {f"[{p.id}] {p.nome}": p.id for p in ativos}
+    # escolha_label = st.selectbox("Paciente", list(options.keys()), key="table_escolha")
+
+
+def render_classes_tab(service: ClinicaService) -> None:
+    st.subheader("Aulas")
+    logger.info("Aba de aulas carregada")
+
+    ativos = get_ativos(service)
+    if not ativos:
+        st.info("Cadastre pacientes primeiro.")
+        return
+
+    options = {f"[{p.id}] {p.nome}": p for p in ativos}
+    escolha_label = st.selectbox("Paciente", list(options.keys()), key="classes_escolha")
+    paciente = options[escolha_label]
+
+    cols = []
+    vals = []
+
+    for dia_nome, attr in [
+        ("Seg", "aula_seg"),
+        ("Ter", "aula_ter"),
+        ("Qua", "aula_qua"),
+        ("Qui", "aula_qui"),
+        ("Sex", "aula_sex"),
+        ("Sáb", "aula_sab"),
+        ("Dom", "aula_dom"),
+    ]:
+        cols.append(dia_nome)
+        vals.append("X" if getattr(paciente, attr, False) else "")
+
+    df = pd.DataFrame([vals], columns=cols, index=[f"[{paciente.id}] {paciente.nome}"])
+    st.dataframe(df, use_container_width=True)
+
+
 def render_pay_tab(service: ClinicaService) -> None:
     st.subheader("Registrar pagamento")
     logger.info("Aba de pagamento carregada")
 
-    try:
-        ativos = service.listar_pacientes(only_active=True)
-        logger.info("Total de pacientes ativos para pagamento: %d", len(ativos))
-    except Exception as exc:
-        st.error(f"Erro ao carregar pacientes: {exc}")
-        logger.error("Erro ao carregar pacientes (pagamento): %s", exc, exc_info=True)
-        return
-
+    ativos = get_ativos(service)
     if not ativos:
         st.info("Cadastre pacientes primeiro.")
         return
@@ -259,8 +403,16 @@ def main() -> None:
         st.error(f"Falha ao inicializar serviços: {exc}")
         return
 
-    tab_list, tab_add, tab_pay, tab_due = st.tabs(
-        [TAB_LABEL_LIST, TAB_LABEL_ADD, TAB_LABEL_PAY, TAB_LABEL_DUE]
+    tab_list, tab_add, tab_edit, tab_table, tab_classes, tab_pay, tab_due = st.tabs(
+        [
+            TAB_LABEL_LIST,
+            TAB_LABEL_ADD,
+            TAB_LABEL_EDIT,
+            TAB_LABEL_TABLE,
+            TAB_LABEL_CLASSES,
+            TAB_LABEL_PAY,
+            TAB_LABEL_DUE,
+        ]
     )
 
     with tab_list:
@@ -268,6 +420,15 @@ def main() -> None:
 
     with tab_add:
         render_add_tab(service)
+
+    with tab_edit:
+        render_edit_tab(service)
+
+    with tab_table:
+        render_table_tab(service)
+
+    with tab_classes:
+        render_classes_tab(service)
 
     with tab_pay:
         render_pay_tab(service)
