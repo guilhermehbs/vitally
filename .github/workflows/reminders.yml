@@ -8,19 +8,21 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
-          python -m pip install -U pip
+          python -m pip install -U pip wheel setuptools
           pip install -r requirements.txt
-          # se o seu projeto usa pacotes locais em src/, garanta que PYTHONPATH vai enxergar:
-          echo 'PYTHONPATH=.' >> $GITHUB_ENV
+          # Garantir que os imports "from src..." funcionem
+          echo "PYTHONPATH=." >> $GITHUB_ENV
 
       - name: Run reminder script
         env:
@@ -34,7 +36,6 @@ jobs:
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           SMTP_USE_TLS: "true"
 
-          # Logging opcional
           LOG_LEVEL: INFO
         run: |
-          PYTHONPATH=. python send_reminders.py
+          PYTHONPATH=. python src/utils/send_reminders.py

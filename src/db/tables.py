@@ -21,3 +21,12 @@ class PacienteSQL(Base):
     aula_sex = Column(Boolean, nullable=False, default=False)
     aula_sab = Column(Boolean, nullable=False, default=False)
     aula_dom = Column(Boolean, nullable=False, default=False)
+
+
+class UserSQL(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)

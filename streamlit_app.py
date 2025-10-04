@@ -12,6 +12,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from src.models.paciente_model import Paciente
+from src.security.auth import get_user_by_email, verify_password
 from src.services.clinica_service import ClinicaService
 
 logging.basicConfig(
@@ -276,7 +277,7 @@ def render_edit_tab(service: ClinicaService) -> None:
         )
         st.success(f"Editado #{paciente.id}")
         for campo, (antes, depois) in updates.items():
-            st.success(f"[EDIT] {campo}: '{antes}' → '{depois}'")
+            st.success(f'[EDIT] {campo}: "{antes}" → "{depois}"')
         sleep(2)
         rerun_app()
     except Exception as exc:
@@ -293,8 +294,8 @@ def render_table_tab(service: ClinicaService) -> None:
         st.info("Cadastre pacientes primeiro.")
         return
 
-    # options = {f"[{p.id}] {p.nome}": p.id for p in ativos}
-    # escolha_label = st.selectbox("Paciente", list(options.keys()), key="table_escolha")
+    # options = {f'[{p.id}] {p.nome}': p.id for p in ativos}
+    # escolha_label = st.selectbox('Paciente', list(options.keys()), key='table_escolha')
 
 
 def render_classes_tab(service: ClinicaService) -> None:
@@ -390,8 +391,90 @@ def render_due_tab(service: ClinicaService) -> None:
     st.dataframe(df, use_container_width=True, hide_index=True)
 
 
+def ensure_auth() -> bool:
+    # Já autenticado?
+    if st.session_state.get("auth_user"):
+        return True
+
+    st.title("🩺 Vitally")
+    st.subheader("Entrar")
+
+    with st.form("login_form", clear_on_submit=False):
+        email = st.text_input("E-mail").strip()
+        password = st.text_input("Senha", type="password")
+        submitted = st.form_submit_button("Entrar")
+
+    if submitted:
+        if not email or not password:
+            st.error("Informe e-mail e senha.")
+            return False
+
+        user = get_user_by_email(email)
+        if not user:
+            st.error("Usuário não encontrado ou inativo.")
+            return False
+
+        if not verify_password(password, user.password_hash):
+            st.error("Senha inválida.")
+            return False
+
+        # Guarda dados mínimos na sessão
+        st.session_state.auth_user = {"id": user.id, "name": user.name, "email": user.email}
+        st.success(f"Bem-vindo(a), {user.name}!")
+        st.rerun()
+
+    return False
+
+
+def logout_button() -> None:
+    with st.sidebar:
+        if st.button("Sair"):
+            st.session_state.pop("auth_user", None)
+            st.experimental_rerun()
+
+
+def header_userbar(user: dict):
+    st.markdown(
+        """
+                    <style>
+                    .vitally-popover { width: 250px; }
+                    .vitally-popover .stMarkdown { margin-bottom: .25rem; }
+                    .vitally-popover hr { margin: .25rem 0; }
+                    </style>
+                """,
+        unsafe_allow_html=True,
+    )
+    _, col_user = st.columns([0.85, 0.15], vertical_alignment="center")
+    with col_user:
+        try:
+            with st.popover(f"👤 {user['name']}"):
+                st.markdown('<div class="vitally-popover">', unsafe_allow_html=True)
+                st.caption(user["email"])
+                st.divider()
+                if st.button("Sair", key="logout_small"):
+                    st.session_state.pop("auth_user", None)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+        except Exception:
+            st.markdown(
+                f'<div style="text-align:right;">👤 <b>{user['name']}</b></div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("Sair", key="logout_top", use_container_width=True):
+                st.session_state.pop("auth_user", None)
+                st.rerun()
+
+
 def main() -> None:
     st.set_page_config(page_title="Vitally", page_icon=PAGE_ICON, layout=LAYOUT)
+
+    if not ensure_auth():
+        return
+
+    user = st.session_state["auth_user"]
+    header_userbar(user)
+    logging.info(f"Usuário logado: ID: {user['id']}, Name: {user['name']}, Email: {user['email']}")
+
     st.title(APP_TITLE)
     logger.info("Página carregada")
 

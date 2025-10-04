@@ -1,182 +1,155 @@
-# 📌 Vitally
+# 🩺 Vitally
 
-Vitally é a plataforma digital que está transformando a forma como clínicas e fisioterapeutas cuidam de seus pacientes.
-Com uma agenda inteligente, notificações automáticas, teleconsultas integradas e prescrição digital personalizada, o Vitally elimina a burocracia e coloca o foco onde realmente importa: a saúde e a evolução do paciente.
+Vitally é uma aplicação web para **gestão de pacientes em clínicas e consultórios**, com foco em fisioterapia.  
+O sistema permite cadastro, edição e acompanhamento de pacientes, controle de pagamentos e vencimentos, além de envio automático de lembretes.
 
-Mais do que um software de gestão, o Vitally é um parceiro para profissionais da saúde que buscam eficiência, organização e uma experiência moderna para seus pacientes.
+O deploy da aplicação está disponível em: [vitally.streamlit.app](https://vitally.streamlit.app)
 
-## 🚀 O que o Vitally oferece
+---
 
-- 📅 Agendamento online inteligente – sem sobreposições, com lista de espera.
+## 🚀 Funcionalidades
 
-- 🔔 Lembretes automáticos – WhatsApp e e-mail para reduzir faltas.
+- 👥 **Gerenciamento de pacientes** (cadastro, edição, listagem e status de ativo/inativo).  
+- 📚 **Controle de aulas** (definição de dias da semana que o paciente participa).  
+- 💳 **Pagamentos** (registro de pagamentos e cálculo automático da próxima cobrança).  
+- 📬 **Lembretes automáticos** de pagamento via e-mail (próximos vencimentos em até 7 dias).  
+- 🔐 **Autenticação de usuários** com hash seguro de senhas (bcrypt).  
+- 📊 **Visualização em tabelas** e exportação de dados.  
+- 🛡️ **Validações automáticas** (e-mail, telefone e dados obrigatórios).  
 
-- 🏋️ Prescrição digital de exercícios – vídeos, PDFs e histórico por paciente.
+---
 
-- 💳 Pagamentos online – consultas avulsas e planos recorrentes.
+## 🛠️ Tecnologias Utilizadas
 
-- 💬 Chat integrado – comunicação entre paciente e fisioterapeuta.
+- [Python 3.11+](https://www.python.org/)  
+- [Streamlit](https://streamlit.io/) – interface web interativa  
+- [SQLAlchemy](https://www.sqlalchemy.org/) – ORM para banco de dados  
+- [SQLite/PostgreSQL] – banco de dados (dependendo da configuração `DATABASE_URL`)  
+- [bcrypt](https://pypi.org/project/bcrypt/) – autenticação e hashing de senhas  
+- [dotenv](https://pypi.org/project/python-dotenv/) – gerenciamento de variáveis de ambiente  
+- [pandas](https://pandas.pydata.org/) – exibição e manipulação de tabelas  
 
-- 📊 Dashboards e relatórios – desempenho clínico e financeiro em tempo real.
-
-- 🎥 Teleconsulta em vídeo – amplie o alcance dos atendimentos.
-
-## 🧩 Público-Alvo
-
-- Fisioterapeutas autônomos que querem profissionalizar seu atendimento.
-
-- Clínicas de pequeno e médio porte que precisam de organização e escalabilidade.
-
-- Pacientes que buscam autonomia e praticidade na relação com o profissional.
-
-- Instituições de ensino que acompanham estudantes em clínicas-escola.
-
-## 🛠️ Stack
-
-- Backend: Django + Django REST Framework (DRF)
-
-- Frontend Web: React (Next.js) + TailwindCSS
-
-- Mobile: React Native (Expo)
-
-- Banco de Dados: PostgreSQL
-
-- Notificações: WhatsApp Cloud API + SendGrid
-
-- Pagamentos: Mercado Pago
-
-- Teleconsulta: LiveKit Cloud
-
-- Infraestrutura: Docker + Redis + Celery + AWS S3
-
-- Observabilidade: Sentry
+---
 
 ## 📂 Estrutura do Projeto
 
 ```bash
 vitally/
-│── backend/
-│   ├── vitally/
-│   ├── apps/
-│   ├── requirements.txt
-│   └── manage.py
-│
-│── web/
-│   ├── src/
-│   │   ├── app/(marketing)
-│   │   ├── app/(dashboard) 
-│   │   └── components/
-│   ├── middleware.ts
-│   └── package.json
-│
-│── mobile/ 
-│   ├── app/ 
-│   ├── src/lib/ 
-│   └── package.json
-│
-│── docker-compose.yml
-│── .env.example
-│── README.md
-│── docs/
-│   └── vitally-contexto.md 
+│── src/
+│   ├── db/
+│   │   ├── db.py
+│   │   └── tables.py
+│   ├── models/
+│   │   └── paciente_model.py
+│   ├── repositories/
+│   │   └── paciente_repository_sql.py
+│   ├── services/
+│   │   └── clinica_service.py
+│   ├── security/
+│   │   └── auth.py
+│   ├── utils/
+│   │   ├── create_user.py
+│   │   └── send_reminders.py
+├── streamlit_app.py
+├── .env.example
+├── requirements.txt
+└── README.md
 ```
 
-## 📖 Documentação
+---
 
-- 📄 [Contexto do Projeto](docs/vitally-contexto.md)
-- Swagger/OpenAPI gerado pelo DRF disponível em /api/docs.
-  
 ## ⚙️ Variáveis de Ambiente
 
-> Veja o arquivo .env.example
+O projeto utiliza um arquivo `.env`. Exemplo:
 
-## 📦 Setup
-
-1. Subir banco e Redis
 ```bash
-docker-compose up -d db redis
+DATABASE_URL=sqlite:///./db.sqlite3
+SMTP_HOST=smtp.seuprovedor.com
+SMTP_PORT=587
+SMTP_USER=usuario
+SMTP_PASS=senha
+SMTP_FROM=nao-responder@vitally.com
+SMTP_USE_TLS=true
 ```
 
-2. Backend (Django + DRF)
+---
+
+## ▶️ Como Rodar Localmente
+
+1. Clone o repositório:
+
 ```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
+git clone https://github.com/seuusuario/vitally.git
+cd vitally
+```
+
+2. Crie e ative o ambiente virtual:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+.venv\Scripts\activate
+```
+
+3. Instale as dependências:
+
+```bash
 pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
 ```
 
-3. Celery (em outro terminal)
+4. Configure o arquivo `.env` com suas credenciais.
+
+5. Execute o app:
+
 ```bash
-celery -A vitally.celery_app worker -l info
-celery -A vitally.celery_app beat -l info
-
+streamlit run src/streamlit_app.py
 ```
 
-4. Web (Next.js)
-```bash
-cd ../web
-npm install
-npm run dev
-```
-
-5. Mobile (React Native + Expo)
-```bash
-cd ../mobile
-npm install
-npx expo start
-```
+---
 
 ## 🔐 Autenticação
 
-- JWT Access/Refresh (SimpleJWT).
+- Usuários são armazenados na tabela `users`.  
+- Senhas são salvas com hash seguro (`bcrypt`).  
+- Login realizado diretamente no app com formulário de autenticação.  
+- Para criar um novo usuário administrador:
 
-- Perfis de usuário: admin, physio, patient.
+```bash
+python src/utils/create_user.py
+```
 
-- Middleware no Next.js protege rotas do dashboard (/app), mantendo / público para marketing/landing.
+---
 
-## 📡 Fluxos Principais
+## 📬 Lembretes Automáticos
 
-- Agenda Inteligente → evita sobreposição, gera lista de espera.
+Um script envia lembretes de cobrança via e-mail para pacientes com vencimento em até 7 dias:
 
-- Notificações → WhatsApp Cloud API e e-mail (SendGrid) para lembretes automáticos.
+```bash
+python src/utils/send_reminders.py
+```
 
-- Pagamentos → Mercado Pago para consultas avulsas e planos recorrentes.
+Certifique-se de que o `.env` contenha as variáveis SMTP configuradas.
 
-- Prescrições → exercícios personalizados, anexos em S3.
+---
 
-- Teleconsultas → LiveKit Cloud (web + mobile).
+## 🌐 Deploy
 
-- Relatórios/Dashboards → consultas, finanças, adesão de pacientes.
+O projeto já está disponível em produção no Streamlit Cloud:  
+🔗 [vitally.streamlit.app](https://vitally.streamlit.app)
 
-## 🛤️ Roadmap
+---
 
-- MVP (v1.0)
+## 📌 Roadmap Futuro
 
-- - Cadastro de pacientes/fisioterapeutas
+- 📱 Integração com WhatsApp para lembretes automáticos.  
+- 📊 Relatórios financeiros e de presença em aulas.  
+- 🔔 Notificações push.  
+- 🧩 Multiusuário com diferentes permissões (admin, gestor, professor).  
 
-- - Agenda inteligente
+---
 
-- - Notificações por e-mail
+## 👨‍💻 Autor
 
-- - Pagamentos online
-
-- - Prescrição de exercícios
-
-- v2.0
-
-- - Área do paciente e fisioterapeuta
-
-- - Relatórios e dashboards
-
-- - Chat integrado
-
-- - Integração WhatsApp Cloud API
-
-- v3.0 (Premium)
-
-- - Teleconsultas (LiveKit)
-
-- - Planos para clínicas (multi-fisio)
-
-- - Automação de lembretes e reativação de pacientes
+Desenvolvido por **Guilherme Henrique Braga e Silva**  
+📧 [Contato](mailto:gui100920@gmail.com)  
+🌐 [GitHub](https://github.com/guilhermehbs) | [LinkedIn](https://www.linkedin.com/in/guilhermehbs)
