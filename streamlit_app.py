@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import logging
-import re
-from collections.abc import Iterable
 from datetime import date
 from time import sleep
-from typing import Any
 
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from src.models.paciente_model import Paciente
 from src.security.auth import get_user_by_email, verify_password
 from src.services.clinica_service import ClinicaService
+from src.utils.add_utils import is_valid_email, only_digits, validate_br_phone
+from src.utils.classes_utils import build_classes_csv, build_classes_ics
+from src.utils.dataframe_utils import make_dataframe
+from src.utils.paciente_utils import get_ativos
+from src.utils.streamlit_utils import rerun_app
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,75 +38,22 @@ APP_TITLE = "🩺 Vitally"
 PAGE_ICON = "🩺"
 LAYOUT = "wide"
 
-TAB_LABEL_LIST = "👥 Pacientes"
-TAB_LABEL_ADD = "➕ Cadastrar"
-TAB_LABEL_EDIT = "📝 Editar"
-TAB_LABEL_TABLE = "📊 Tabela"
-TAB_LABEL_CLASSES = "📚 Aulas"
-TAB_LABEL_PAY = "💳 Pagamento"
-TAB_LABEL_DUE = "📬 Vencimentos proximos"
+TAB_LABEL_LIST = "👥 Lista de Pacientes"
+TAB_LABEL_ADD = "➕ Novo Paciente"
+TAB_LABEL_EDIT = "✍️ Editar Paciente"
+TAB_LABEL_TABLE = "📊 Matriz de Mobilidade & Estabilidade"
+TAB_LABEL_CLASSES = "📅 Plano de Aulas"
+TAB_LABEL_PAY = "💰 Pagamentos"
+TAB_LABEL_DUE = "⏰ Próximos Vencimentos"
 
 DATE_FMT_DISPLAY = "%d/%m/%Y"
-
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-def is_valid_email(email: str) -> bool:
-    if not email:
-        logger.debug("is_valid_email: vazio -> True")
-        return True
-    ok = bool(EMAIL_RE.fullmatch(email))
-    logger.debug("is_valid_email(%s) -> %s", email, ok)
-    return ok
-
-
-def only_digits(s: str) -> str:
-    digits = re.sub(r"\D", "", s or "")
-    logger.debug("only_digits(%s) -> %s", s, digits)
-    return digits
-
-
-def validate_br_phone(digits: str) -> tuple[bool, str | None]:
-    d = only_digits(digits)
-    if len(d) not in (10, 11):
-        return False, "Telefone deve ter 10 (fixo) ou 11 (celular) dígitos."
-    if d[0] == "0" or d[1] == "0":
-        return False, "DDD inválido."
-    if len(d) == 11 and d[2] != "9":
-        return False, "Para celular (11 dígitos), o número deve começar com 9."
-    return True, None
-
-
-def rerun_app() -> None:
-    logger.debug("Solicitando rerun do Streamlit")
-    if hasattr(st, "rerun"):
-        st.rerun()
-    elif hasattr(st, "experimental_rerun"):
-        st.experimental_rerun()
-    else:
-        logger.critical("Streamlit sem método de rerun disponível")
-        raise RuntimeError("Versão do Streamlit não possui rerun disponível")
-
-
-def get_ativos(service: ClinicaService) -> list[Paciente]:
-    try:
-        ativos = list(service.listar_pacientes(only_active=True))
-    except Exception as exc:
-        st.error(f"Erro ao listar pacientes: {exc}")
-        return []
-    return ativos
 
 
 def format_date_br(d: date | None) -> str:
     return d.strftime(DATE_FMT_DISPLAY) if d else ""
 
 
-def make_dataframe(rows: Iterable[dict[str, Any]]) -> pd.DataFrame:
-    df = pd.DataFrame(list(rows))
-    return df if not df.empty else pd.DataFrame()
-
-
-def render_list_tab(service: ClinicaService) -> None:
+def render_pacientes_list_tab(service: ClinicaService) -> None:
     st.subheader("Lista de pacientes")
     only_active = st.checkbox("Somente ativos", value=True, key="chk_only_active")
     logger.info("Listando pacientes (somente_ativos=%s)", only_active)
@@ -286,16 +234,98 @@ def render_edit_tab(service: ClinicaService) -> None:
 
 
 def render_table_tab(service: ClinicaService) -> None:
-    st.subheader("Tabela")
-    logger.info("Aba de tabela carregada")
+    st.subheader("Mapa de Exercícios (Pilates)")
 
+    aparelhos = ["Solo", "Chair", "Cadillac", "Reformer", "Barrel"]
+    segmentos = ["Cervical", "MMSS", "Tronco", "Abdômen", "MMII"]
+
+    base_rows = []
+    for ap in aparelhos:
+        row = {"Aparelho": ap}
+        for seg in segmentos:
+            row[seg] = "M / E"
+        base_rows.append(row)
+    df_base = pd.DataFrame(base_rows)
+    st.markdown("**Matriz de referência (fixa):**")
+    st.dataframe(df_base, use_container_width=True, hide_index=True)
+    st.divider()
+
+    st.markdown("**Plano por paciente (selecione por célula M, E ou M/E):**")
     ativos = get_ativos(service)
     if not ativos:
         st.info("Cadastre pacientes primeiro.")
         return
 
-    # options = {f'[{p.id}] {p.nome}': p.id for p in ativos}
-    # escolha_label = st.selectbox('Paciente', list(options.keys()), key='table_escolha')
+    pac_opts = {f"[{p.id}] {p.nome}": p for p in ativos}
+    escolha_label = st.selectbox("Paciente", list(pac_opts.keys()), key="pilates_paciente_escolha")
+    paciente = pac_opts[escolha_label]
+    pid = paciente.id
+
+    if "pilates_plan" not in st.session_state:
+        st.session_state.pilates_plan = {}
+
+    if pid not in st.session_state.pilates_plan:
+        rows = []
+        for ap in aparelhos:
+            r = {"Aparelho": ap}
+            for seg in segmentos:
+                r[seg] = ""
+            rows.append(r)
+        st.session_state.pilates_plan[pid] = pd.DataFrame(rows, columns=["Aparelho", *segmentos])
+
+    plan_df = st.session_state.pilates_plan[pid]
+
+    col_config = {"Aparelho": st.column_config.TextColumn("Aparelho", disabled=True)}
+    select_opts = ["", "M", "E", "M/E"]
+    for seg in segmentos:
+        col_config[seg] = st.column_config.SelectboxColumn(
+            f"{seg}",
+            options=select_opts,
+            required=False,
+            help="Selecione M, E ou M/E para este segmento e aparelho.",
+        )
+
+    edited = st.data_editor(
+        plan_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config=col_config,
+        num_rows="fixed",
+        key=f"pilates_editor_{pid}",
+    )
+    st.session_state.pilates_plan[pid] = edited
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        csv = edited.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Baixar plano (CSV)",
+            data=csv,
+            file_name=f"plano_pilates_paciente_{pid}_{paciente.nome}.csv",
+            mime="text/csv",
+            key=f"dl_csv_{pid}",
+        )
+
+    with col2:
+        resumo = []
+        for _, row in edited.iterrows():
+            ap = row["Aparelho"]
+            for seg in segmentos:
+                val = (row.get(seg) or "").strip()
+                if val == "M/E":
+                    marcacoes = ["M", "E"]
+                elif val in ("M", "E"):
+                    marcacoes = [val]
+                else:
+                    marcacoes = []
+
+                if marcacoes:
+                    resumo.append({"Aparelho": ap, "Segmento": seg, "Marcado": "/".join(marcacoes)})
+
+        if resumo:
+            st.dataframe(pd.DataFrame(resumo), use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhuma marcação ativa neste plano.")
 
 
 def render_classes_tab(service: ClinicaService) -> None:
@@ -328,6 +358,42 @@ def render_classes_tab(service: ClinicaService) -> None:
 
     df = pd.DataFrame([vals], columns=cols, index=[f"[{paciente.id}] {paciente.nome}"])
     st.dataframe(df, use_container_width=True)
+
+    st.markdown("### Exportar plano de aulas")
+
+    col_a, col_b, col_c = st.columns([1, 1, 2])
+    with col_a:
+        csv_bytes = build_classes_csv(paciente)
+        st.download_button(
+            label="Baixar CSV (dias de aula)",
+            data=csv_bytes,
+            file_name=f"plano_aulas_{paciente.id}_{paciente.nome}.csv",
+            mime="text/csv",
+            key=f"dl_csv_classes_{paciente.id}",
+        )
+
+    with col_b:
+        ics_bytes = build_classes_ics(
+            paciente=paciente,
+            start_on=date.today(),
+            start_time_str="08:00",
+            duration_minutes=60,
+            tzid="America/Sao_Paulo",
+        )
+        st.download_button(
+            label="Baixar .ics (calendário semanal)",
+            data=ics_bytes,
+            file_name=f"plano_aulas_{paciente.id}_{paciente.nome}.ics",
+            mime="text/calendar",
+            key=f"dl_ics_classes_{paciente.id}",
+        )
+
+    with col_c:
+        st.caption(
+            "• CSV: visão simples dos dias marcados (Sim/Não).  \n"
+            "• ICS: evento semanal recorrente com BYDAY (usado "
+            "para importar no calendário Google/Outlook)."
+        )
 
 
 def render_pay_tab(service: ClinicaService) -> None:
@@ -392,7 +458,6 @@ def render_due_tab(service: ClinicaService) -> None:
 
 
 def ensure_auth() -> bool:
-    # Já autenticado?
     if st.session_state.get("auth_user"):
         return True
 
@@ -418,7 +483,6 @@ def ensure_auth() -> bool:
             st.error("Senha inválida.")
             return False
 
-        # Guarda dados mínimos na sessão
         st.session_state.auth_user = {"id": user.id, "name": user.name, "email": user.email}
         st.success(f"Bem-vindo(a), {user.name}!")
         st.rerun()
@@ -499,7 +563,7 @@ def main() -> None:
     )
 
     with tab_list:
-        render_list_tab(service)
+        render_pacientes_list_tab(service)
 
     with tab_add:
         render_add_tab(service)
