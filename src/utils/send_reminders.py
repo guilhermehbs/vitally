@@ -12,8 +12,10 @@ from email.message import EmailMessage
 from dotenv import load_dotenv
 from sqlalchemy import and_, select
 
-from src.db.db import SessionLocal
-from src.db.tables import PacienteSQL
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.db.db import SessionLocal  # noqa: E402
+from src.db.tables import PacienteSQL  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +45,7 @@ def build_message(
 
     html = f"""
     <html>
-      <body style="font-family: Arial, sans-serif; line-height:1.5;">
+      <body style='font-family: Arial, sans-serif; line-height:1.5;'>
         <p>Olá, <strong>{nome}</strong>!</p>
         <p>Este é um lembrete de pagamento. Sua <strong>próxima cobrança</strong> está prevista para
            <strong>{venc_br}</strong>.</p>
