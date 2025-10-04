@@ -512,7 +512,7 @@ def header_userbar(user: dict):
     with col_user:
         try:
             with st.popover(f"👤 {user['name']}"):
-                st.markdown('<div class="vitally-popover">', unsafe_allow_html=True)
+                st.markdown("<div class='vitally-popover'>", unsafe_allow_html=True)
                 st.caption(user["email"])
                 st.divider()
                 if st.button("Sair", key="logout_small"):
@@ -521,7 +521,7 @@ def header_userbar(user: dict):
                 st.markdown("</div>", unsafe_allow_html=True)
         except Exception:
             st.markdown(
-                f'<div style="text-align:right;">👤 <b>{user['name']}</b></div>',
+                f"<div style='text-align:right;'>👤 <b>{user['name']}</b></div>",
                 unsafe_allow_html=True,
             )
             if st.button("Sair", key="logout_top", use_container_width=True):
