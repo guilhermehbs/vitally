@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from time import sleep
 
 import pandas as pd
@@ -13,8 +13,8 @@ from src.services.clinica_service import ClinicaService
 from src.utils.add_utils import is_valid_email, only_digits, validate_br_phone
 from src.utils.classes_utils import build_classes_csv, build_classes_ics
 from src.utils.dataframe_utils import make_dataframe
-from src.utils.paciente_utils import get_ativos
 from src.utils.streamlit_utils import rerun_app
+from src.utils.user_utils import get_fisioterapeutas, get_paciente_ativos
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,6 +45,9 @@ TAB_LABEL_TABLE = "📊 Matriz de Mobilidade & Estabilidade"
 TAB_LABEL_CLASSES = "📅 Plano de Aulas"
 TAB_LABEL_PAY = "💰 Pagamentos"
 TAB_LABEL_DUE = "⏰ Próximos Vencimentos"
+TAB_LABEL_FISIO = "👩‍⚕️ Fisioterapeutas"
+TAB_LABEL_FISIO_DISP = "👩‍⚕️ Fisioterapeutas Disp"
+TAB_LABEL_FISIO_GRADE = "👩‍⚕️ Fisioterapeutas Grade"
 
 DATE_FMT_DISPLAY = "%d/%m/%Y"
 
@@ -59,7 +62,7 @@ def render_pacientes_list_tab(service: ClinicaService) -> None:
     logger.info("Listando pacientes (somente_ativos=%s)", only_active)
 
     try:
-        pacientes = service.listar_pacientes(only_active)
+        pacientes = get_paciente_ativos(service)
         logger.info("Total retornado: %d", len(pacientes))
     except Exception as exc:
         st.error(f"Erro ao listar pacientes: {exc}")
@@ -157,7 +160,7 @@ def render_edit_tab(service: ClinicaService) -> None:
     st.subheader("Editar paciente")
     logger.info("Aba de edição carregada")
 
-    ativos = get_ativos(service)
+    ativos = get_paciente_ativos(service)
     if not ativos:
         st.info("Cadastre pacientes primeiro.")
         return
@@ -192,22 +195,49 @@ def render_edit_tab(service: ClinicaService) -> None:
             key="edit_dias",
         )
 
+        weekday_map = {
+            "Segunda": 0,
+            "Terça": 1,
+            "Quarta": 2,
+            "Quinta": 3,
+            "Sexta": 4,
+            "Sábado": 5,
+            "Domingo": 6,
+        }
+        horarios: list[tuple[int, str]] = []
+        for dia_nome in dias_selecionados:
+            t = st.time_input(f"Horário em {dia_nome}", key=f"time_{dia_nome}")
+            horarios.append((weekday_map[dia_nome], f"{t.hour:02d}:{t.minute:02d}"))
+
+        fisioterapeutas = get_fisioterapeutas(service)
+        if not fisioterapeutas:
+            st.info("Cadastre fisioterapeutas primeiro.")
+            return
+
+        options_fisio = {f"[{f.id}] {f.nome}": f for f in fisioterapeutas}
+        escolha_label = st.selectbox(
+            "Fisioterapeuta", list(options_fisio.keys()), key="edit_escolha_fisioterapeuta"
+        )
+
+        fisioterapeuta = options_fisio[escolha_label]
+        fisioterapeuta_id = fisioterapeuta.id
+
         submitted = st.form_submit_button("Editar")
 
     if not submitted:
         return
 
     if not nome:
-        st.error("Informe o nome.")
+        st.error("Informe o nome")
         return
     if email and not is_valid_email(email):
-        st.error("E-mail inválido.")
+        st.error("Email inválido")
         return
 
     fone_digits = only_digits(telefone_raw)
     ok, msg = validate_br_phone(fone_digits)
     if not ok:
-        st.error(msg or "Telefone inválido. Digite DDD + número (ex.: 3199XXXXXXX ou 3130XXXXXX).")
+        st.error(msg or "Telefone inválido. Digite DDD + número (ex.: 3199XXXXXXX ou 3130XXXXXX)")
         return
 
     dia_kwargs = {}
@@ -222,6 +252,13 @@ def render_edit_tab(service: ClinicaService) -> None:
             telefone=fone_digits,
             data_entrada=data_entrada,
             **dia_kwargs,
+        )
+        service.definir_aulas_paciente(
+            paciente_id=pid,
+            aulas=horarios,
+            fisioterapeuta_id=fisioterapeuta_id,
+            duracao_min=60,
+            semanas=4,
         )
         st.success(f"Editado #{paciente.id}")
         for campo, (antes, depois) in updates.items():
@@ -251,7 +288,7 @@ def render_table_tab(service: ClinicaService) -> None:
     st.divider()
 
     st.markdown("**Plano por paciente (selecione por célula M, E ou M/E):**")
-    ativos = get_ativos(service)
+    ativos = get_paciente_ativos(service)
     if not ativos:
         st.info("Cadastre pacientes primeiro.")
         return
@@ -332,7 +369,7 @@ def render_classes_tab(service: ClinicaService) -> None:
     st.subheader("Aulas")
     logger.info("Aba de aulas carregada")
 
-    ativos = get_ativos(service)
+    ativos = get_paciente_ativos(service)
     if not ativos:
         st.info("Cadastre pacientes primeiro.")
         return
@@ -400,7 +437,7 @@ def render_pay_tab(service: ClinicaService) -> None:
     st.subheader("Registrar pagamento")
     logger.info("Aba de pagamento carregada")
 
-    ativos = get_ativos(service)
+    ativos = get_paciente_ativos(service)
     if not ativos:
         st.info("Cadastre pacientes primeiro.")
         return
@@ -529,6 +566,124 @@ def header_userbar(user: dict):
                 st.rerun()
 
 
+def render_fisio_tab(service: ClinicaService) -> None:
+    st.subheader("Cadastro de Fisioterapeutas")
+    with st.form("form_add_fisio"):
+        nome = st.text_input("Nome").strip()
+        email = st.text_input("E-mail (opcional)").strip()
+        ok = st.form_submit_button("Cadastrar")
+    if ok:
+        if not nome:
+            st.error("Informe o nome.")
+        else:
+            service.criar_fisioterapeuta(nome, email or None)
+            st.success("Fisioterapeuta cadastrado.")
+            rerun_app()
+
+    st.divider()
+    st.markdown("### Ativos")
+    fisios = get_fisioterapeutas(service)
+    st.dataframe(
+        make_dataframe({"Id": f.id, "Nome": f.nome, "E-mail": f.email} for f in fisios),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def render_fisio_dispon_tab(service: ClinicaService) -> None:
+    st.subheader("Disponibilidade do Fisioterapeuta")
+    fisios = get_fisioterapeutas(service)
+    if not fisios:
+        st.info("Cadastre um fisioterapeuta")
+        return
+
+    options = {f"[{f.id}] {f.nome}": f for f in fisios}
+    escolha = st.selectbox("Fisioterapeuta", list(options.keys()))
+    fisio = options[escolha]
+
+    dias = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+    weekday_map = {d: i for i, d in enumerate(dias)}
+    rows = []
+    with st.form("form_dispon"):
+        st.caption("Preencha as janelas (opcional deixar em branco)")
+        for d in dias:
+            c1, c2, c3 = st.columns([1, 1, 1])
+            with c1:
+                on = st.checkbox(d, key=f"chk_{d}")
+            with c2:
+                h1 = st.time_input("Início", key=f"ini_{d}", disabled=not on)
+            with c3:
+                h2 = st.time_input("Fim", key=f"fim_{d}", disabled=not on)
+            if on:
+                rows.append(
+                    (
+                        weekday_map[d],
+                        f"{h1.hour:02d}:{h1.minute:02d}",
+                        f"{h2.hour:02d}:{h2.minute:02d}",
+                    )
+                )
+        ok = st.form_submit_button("Salvar disponibilidades")
+
+    if ok:
+        service.definir_disponibilidades_fisio(fisio.id, rows)
+        st.success("Disponibilidades salvas.")
+
+
+def render_grade_fisio_tab(service: ClinicaService) -> None:
+    st.subheader("Grade do Fisioterapeuta")
+    fisios = get_fisioterapeutas(service)
+    if not fisios:
+        st.info("Cadastre um fisioterapeuta")
+        return
+
+    options = {f"[{f.id}] {f.nome}": f for f in fisios}
+    escolha = st.selectbox("Fisioterapeuta", list(options.keys()), key="grade_fisio_escolha")
+    fisio = options[escolha]
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        semana_ini = st.date_input("Início da semana", value=date.today())
+    with col2:
+        slot_min = st.number_input("Tamanho do slot (min)", value=60, min_value=15, step=15)
+
+    data_fim = semana_ini + timedelta(days=6)
+    itens = service.grade_do_fisio(fisio.id, semana_ini, data_fim)
+
+    try:
+        todos = service.listar_pacientes(only_active=False)
+        nome_by_id = {p.id: p.nome for p in todos}
+    except Exception:
+        nome_by_id = {}
+
+    import pandas as pd
+
+    dias = [semana_ini + timedelta(days=i) for i in range(7)]
+    horas = []
+    from datetime import datetime, time
+    from datetime import timedelta as td
+
+    dia_start = time(6, 0)
+    dia_end = time(22, 0)
+    cur = datetime.combine(semana_ini, dia_start)
+    end = datetime.combine(semana_ini, dia_end)
+    while cur.time() <= end.time():
+        horas.append(cur.time().strftime("%H:%M"))
+        cur += td(minutes=slot_min)
+
+    grid = {h: {d.strftime("%a %d/%m"): "" for d in dias} for h in horas}
+
+    for ag in itens:
+        chave_col = ag.data.strftime("%a %d/%m")
+        chave_linha = ag.hora_inicio.strftime("%H:%M")
+        nome = ""
+        if ag.paciente_id:
+            nome = nome_by_id.get(ag.paciente_id, f"#{ag.paciente_id}")
+        grid.setdefault(chave_linha, {})[chave_col] = nome or "Livre"
+
+    df = pd.DataFrame.from_dict(grid, orient="index")[list(c for c in grid[horas[0]].keys())]
+    st.dataframe(df, use_container_width=True)
+
+
 def main() -> None:
     st.set_page_config(page_title="Vitally", page_icon=PAGE_ICON, layout=LAYOUT)
 
@@ -550,7 +705,18 @@ def main() -> None:
         st.error(f"Falha ao inicializar serviços: {exc}")
         return
 
-    tab_list, tab_add, tab_edit, tab_table, tab_classes, tab_pay, tab_due = st.tabs(
+    (
+        tab_list,
+        tab_add,
+        tab_edit,
+        tab_table,
+        tab_classes,
+        tab_pay,
+        tab_due,
+        tab_fisio,
+        tab_fisio_disp,
+        tab_fisio_grade,
+    ) = st.tabs(
         [
             TAB_LABEL_LIST,
             TAB_LABEL_ADD,
@@ -559,6 +725,9 @@ def main() -> None:
             TAB_LABEL_CLASSES,
             TAB_LABEL_PAY,
             TAB_LABEL_DUE,
+            TAB_LABEL_FISIO,
+            TAB_LABEL_FISIO_DISP,
+            TAB_LABEL_FISIO_GRADE,
         ]
     )
 
@@ -582,6 +751,15 @@ def main() -> None:
 
     with tab_due:
         render_due_tab(service)
+
+    with tab_fisio:
+        render_fisio_tab(service)
+
+    with tab_fisio_disp:
+        render_fisio_dispon_tab(service)
+
+    with tab_fisio_grade:
+        render_grade_fisio_tab(service)
 
 
 if __name__ == "__main__":
