@@ -209,3 +209,16 @@ __marimo__/
 credentials.json
 
 .streamlit/
+
+test.py
+
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sqlite-journal
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.bak
