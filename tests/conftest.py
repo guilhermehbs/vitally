@@ -21,11 +21,17 @@ def clean_db():
     from src.db.db import engine
     from src.db.tables import PacienteSQL
 
-    table = PacienteSQL.__table__
-    table_name = table.name
+    table_name = PacienteSQL.__table__.name
 
     with engine.begin() as conn:
-        conn.exec_driver_sql(f'TRUNCATE TABLE "{table_name}" RESTART IDENTITY CASCADE;')
+        if engine.dialect.name == "sqlite":
+            conn.exec_driver_sql(f'DELETE FROM "{table_name}";')
+            try:
+                conn.exec_driver_sql(f"DELETE FROM sqlite_sequence WHERE name='{table_name}';")
+            except Exception:
+                pass
+        else:
+            conn.exec_driver_sql(f'TRUNCATE TABLE "{table_name}" RESTART IDENTITY CASCADE;')
     yield
 
 
