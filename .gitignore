@@ -222,3 +222,4 @@ test.py
 *.sqlite-wal
 *.sqlite-shm
 *.bak
+test.py
