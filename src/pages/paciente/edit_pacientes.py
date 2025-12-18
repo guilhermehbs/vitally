@@ -87,14 +87,12 @@ def render_edit_pacientes_tab(service: ClinicaService) -> None:
         key="edit_escolha",
     )
 
-    # 🔒 Nenhum paciente selecionado
     if escolha_label == LABEL_VAZIO:
         st.info("Selecione um paciente para editar.")
         return
 
     paciente = options_pac[escolha_label]
 
-    # 🔑 Sincroniza estado ao trocar paciente
     if st.session_state.get("edit_paciente_id") != paciente.id:
         st.session_state["edit_paciente_id"] = paciente.id
         st.session_state["edit_nome"] = paciente.nome
