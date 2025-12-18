@@ -56,7 +56,7 @@ def _validar_campos(nome, email, telefone_raw, data_entrada):
     fone_digits = only_digits(telefone_raw or "")
     ok, msg = validate_br_phone(fone_digits)
     if not ok:
-        st.error(msg or "Telefone inválido. Digite DDD + número (ex.: 3199XXXXXXX ou 3130XXXXXX)")
+        st.error(msg or "Telefone inválido. Digite DDD + número")
         return False
 
     if data_entrada > date.today():
@@ -76,32 +76,50 @@ def render_edit_pacientes_tab(service: ClinicaService) -> None:
         return
 
     labels_pac, options_pac = _build_options(ativos, lambda p: f"[{p.id}] {p.nome}")
-    escolha_label = st.selectbox("Paciente", labels_pac, key="edit_escolha")
+
+    LABEL_VAZIO = "— Selecione um paciente —"
+    labels_pac = [LABEL_VAZIO] + labels_pac
+
+    escolha_label = st.selectbox(
+        "Paciente",
+        labels_pac,
+        index=0,
+        key="edit_escolha",
+    )
+
+    if escolha_label == LABEL_VAZIO:
+        st.info("Selecione um paciente para editar.")
+        return
+
     paciente = options_pac[escolha_label]
+
+    if st.session_state.get("edit_paciente_id") != paciente.id:
+        st.session_state["edit_paciente_id"] = paciente.id
+        st.session_state["edit_nome"] = paciente.nome
+        st.session_state["edit_email"] = paciente.email or ""
+        st.session_state["edit_telefone"] = paciente.telefone or ""
+        st.session_state["edit_data_entrada"] = paciente.data_entrada or date.today()
+        st.session_state["edit_dias"] = [d for d, attr in DIAS if getattr(paciente, attr, False)]
 
     with st.form("form_edit_paciente", clear_on_submit=False):
         pid = paciente.id
 
-        nome = st.text_input("Nome", key="edit_nome", value=paciente.nome).strip()
-        email = st.text_input("Email", key="edit_email", value=paciente.email or "").strip()
+        nome = st.text_input("Nome", key="edit_nome").strip()
+        email = st.text_input("Email", key="edit_email").strip()
         telefone_raw = st.text_input(
             "Telefone",
             key="edit_telefone",
             placeholder="31999999999",
-            value=paciente.telefone or "",
         )
         data_entrada = st.date_input(
             "Data de entrada",
-            value=paciente.data_entrada or date.today(),
-            format="DD/MM/YYYY",
             key="edit_data_entrada",
+            format="DD/MM/YYYY",
         )
 
-        dias_default = [d for d, attr in DIAS if getattr(paciente, attr, False)]
         dias_selecionados = st.multiselect(
             "Dias de aula",
             [d for d, _ in DIAS],
-            default=dias_default,
             key="edit_dias",
         )
 
@@ -113,9 +131,7 @@ def render_edit_pacientes_tab(service: ClinicaService) -> None:
             hora_str = st.selectbox(
                 f"Horário em {dia_nome}",
                 options=opcoes_horas,
-                index=opcoes_horas.index("09:00") if "09:00" in opcoes_horas else 0,
                 key=f"time_{dia_nome}_select",
-                placeholder="Selecione um horário",
             )
             horarios.append((WEEKDAY_MAP[dia_nome], hora_str))
 
@@ -138,17 +154,13 @@ def render_edit_pacientes_tab(service: ClinicaService) -> None:
 
         submitted = st.form_submit_button("Editar", disabled=not fisio_disponivel)
 
-    if not fisio_disponivel:
-        return
-
-    if not submitted:
+    if not fisio_disponivel or not submitted:
         return
 
     if not _validar_campos(nome, email, telefone_raw, data_entrada):
         return
 
     fone_digits = only_digits(telefone_raw or "")
-
     dia_kwargs = {attr: (dia_nome in dias_selecionados) for dia_nome, attr in DIAS}
 
     try:
@@ -177,5 +189,5 @@ def render_edit_pacientes_tab(service: ClinicaService) -> None:
         rerun_app()
 
     except Exception as exc:
-        st.error(f"Erro ao cadastrar paciente: {exc}")
-        logger.error("Erro ao cadastrar paciente: %s", exc, exc_info=True)
+        st.error(f"Erro ao editar paciente: {exc}")
+        logger.error("Erro ao editar paciente: %s", exc, exc_info=True)

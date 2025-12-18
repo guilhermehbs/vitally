@@ -158,3 +158,23 @@ class PacienteRepositorySQL:
             )
             rows = s.execute(stmt).scalars().all()
             return [self._to_model(r) for r in rows]
+
+    def deletar(self, paciente_id: int) -> None:
+        with self._Session() as s:
+            paciente = s.query(PacienteSQL).filter(PacienteSQL.id == paciente_id).first()
+
+            if not paciente:
+                raise ValueError("Paciente não encontrado")
+
+            s.delete(paciente)
+            s.commit()
+
+    def inativar(self, paciente_id: int) -> None:
+        with self._Session() as s:
+            paciente = s.query(PacienteSQL).filter(PacienteSQL.id == paciente_id).first()
+
+            if not paciente:
+                raise ValueError("Paciente não encontrado")
+
+            paciente.ativo = False
+            s.commit()

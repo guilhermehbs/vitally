@@ -202,3 +202,9 @@ class ClinicaService:
             .first()
         )
         return q is not None
+
+    def deletar_paciente(self, paciente_id: int) -> None:
+        self._repo.deletar(paciente_id)
+
+    def inativar_paciente(self, paciente_id: int) -> None:
+        self._repo.inativar(paciente_id)
